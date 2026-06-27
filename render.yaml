@@ -1,0 +1,16 @@
+services:
+  - type: web
+    name: mineradio-mobile
+    env: node
+    buildCommand: npm install
+    startCommand: node server.js
+    envVars:
+      - key: HOST
+        value: 0.0.0.0
+      - key: COOKIE_FILE
+        value: /tmp/.cookie
+      - key: QQ_COOKIE_FILE
+        value: /tmp/.qq-cookie
+      - key: MINERADIO_BEAT_CACHE_DIR
+        value: /tmp/beatmaps
+    plan: free
