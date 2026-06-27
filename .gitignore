@@ -1,0 +1,4 @@
+node_modules/
+updates/
+*.tmp
+.env

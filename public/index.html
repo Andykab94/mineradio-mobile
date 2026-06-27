@@ -1,0 +1,935 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>Mineradio</title>
+<style>
+:root {
+  --bg: #06080A;
+  --paper: #0C0F13;
+  --glass: rgba(14,17,21,0.85);
+  --glass-border: rgba(255,255,255,0.06);
+  --accent: #00F5D4;
+  --accent-rgb: 0,245,212;
+  --ink: #E6ECF0;
+  --ink2: #A0A8B0;
+  --muted: #5A6068;
+  --hair: rgba(255,255,255,0.05);
+  --champagne: #f4d28a;
+  --danger: #FF5367;
+  --netease: #d95b67;
+  --qq: #00F5D4;
+  --font: "Noto Sans SC","PingFang SC","Microsoft YaHei",-apple-system,sans-serif;
+  --radius: 16px;
+  --safe-bottom: env(safe-area-inset-bottom, 16px);
+}
+*,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
+html,body{height:100%;width:100%;overflow:hidden;background:var(--bg);color:var(--ink);font-family:var(--font);-webkit-font-smoothing:antialiased;user-select:none;-webkit-user-select:none;-webkit-tap-highlight-color:transparent;touch-action:manipulation}
+body{display:flex;flex-direction:column}
+
+/* Canvas background */
+#particle-canvas{position:fixed;inset:0;z-index:0;pointer-events:none;opacity:0.6}
+
+/* Main container */
+#app{position:relative;z-index:1;display:flex;flex-direction:column;height:100%;width:100%;max-width:480px;margin:0 auto}
+
+/* Header */
+#header{display:flex;align-items:center;justify-content:space-between;padding:12px 16px;gap:12px;flex-shrink:0}
+#header-left{display:flex;align-items:center;gap:8px;min-width:0}
+#avatar-btn{width:36px;height:36px;border-radius:50%;background:var(--hair);border:1.5px solid var(--glass-border);cursor:pointer;overflow:hidden;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:14px;color:var(--muted)}
+#avatar-btn img{width:100%;height:100%;object-fit:cover}
+#user-name{font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:120px}
+#weather-chip{display:flex;align-items:center;gap:4px;padding:6px 10px;border-radius:20px;background:var(--glass);border:1px solid var(--glass-border);font-size:11px;color:var(--champagne);cursor:pointer;flex-shrink:0}
+#weather-chip .temp{font-weight:700;font-size:14px}
+#header-right{display:flex;gap:6px}
+
+/* Tab bar */
+#tabs{display:flex;padding:0 16px;gap:4px;flex-shrink:0;margin-bottom:8px}
+.tab{flex:1;padding:10px 0;text-align:center;font-size:13px;font-weight:600;color:var(--muted);border-bottom:2px solid transparent;cursor:pointer;transition:all .2s}
+.tab.active{color:var(--accent);border-bottom-color:var(--accent)}
+
+/* Content area */
+#content{flex:1;overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch;padding:0 16px;scroll-behavior:smooth}
+#content::-webkit-scrollbar{display:none}
+
+/* Page containers */
+.page{display:none;padding-bottom:calc(80px + var(--safe-bottom))}
+.page.active{display:block}
+
+/* Home - Weather Radio */
+.weather-hero{text-align:center;padding:20px 0}
+.weather-city{font-size:14px;color:var(--champagne);margin-bottom:2px}
+.weather-desc{font-size:28px;font-weight:900;margin-bottom:2px}
+.weather-temp{font-size:48px;font-weight:900;background:linear-gradient(135deg,var(--champagne),var(--accent));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+.weather-mood{font-size:13px;color:var(--ink2);margin-top:4px}
+.weather-playlist{margin-top:16px}
+
+/* Song list */
+.song-list{display:flex;flex-direction:column;gap:2px}
+.song-item{display:flex;align-items:center;gap:12px;padding:10px 12px;border-radius:12px;cursor:pointer;transition:background .15s;background:transparent}
+.song-item:active,.song-item:hover{background:var(--hair)}
+.song-cover{width:48px;height:48px;border-radius:8px;object-fit:cover;flex-shrink:0;background:var(--hair)}
+.song-info{flex:1;min-width:0}
+.song-name{font-size:14px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.song-artist{font-size:12px;color:var(--ink2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:2px}
+.song-source{font-size:10px;padding:2px 6px;border-radius:4px;font-weight:700;flex-shrink:0}
+.song-source.netease{background:rgba(217,91,103,.15);color:var(--netease)}
+.song-source.qq{background:rgba(0,245,212,.12);color:var(--qq)}
+
+/* Section headers */
+.section-title{font-size:12px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.1em;margin:16px 0 8px;padding:0 4px}
+
+/* Search */
+#search-input-wrap{position:relative;margin-bottom:12px}
+#search-input{width:100%;padding:14px 44px 14px 16px;border-radius:var(--radius);background:var(--glass);border:1px solid var(--glass-border);color:var(--ink);font-size:15px;font-family:var(--font);outline:none;transition:border-color .2s}
+#search-input:focus{border-color:var(--accent)}
+#search-input::placeholder{color:var(--muted)}
+#search-clear{position:absolute;right:12px;top:50%;transform:translateY(-50%);width:28px;height:28px;border-radius:50%;background:var(--hair);border:none;color:var(--ink2);cursor:pointer;font-size:14px;display:none}
+
+/* Login */
+#login-section{text-align:center;padding:40px 20px}
+#login-section h2{font-size:20px;margin-bottom:8px}
+#login-section p{font-size:13px;color:var(--ink2);margin-bottom:24px}
+#qr-container{display:inline-block;padding:16px;background:#fff;border-radius:16px;margin-bottom:16px}
+#qr-container img{width:200px;height:200px;display:block}
+#login-status{font-size:12px;color:var(--champagne);margin-top:8px}
+.provider-tabs{display:flex;gap:8px;justify-content:center;margin-bottom:16px}
+.provider-tab{padding:8px 20px;border-radius:20px;border:1px solid var(--glass-border);background:var(--glass);color:var(--ink2);cursor:pointer;font-size:13px;font-weight:600;transition:all .2s}
+.provider-tab.active{background:rgba(var(--accent-rgb),.12);border-color:var(--accent);color:var(--accent)}
+
+/* Player bar (fixed bottom) */
+#player-bar{position:fixed;bottom:0;left:0;right:0;z-index:100;padding:8px 16px calc(8px + var(--safe-bottom));background:var(--glass);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);border-top:1px solid var(--glass-border)}
+#player-bar-inner{display:flex;align-items:center;gap:12px;max-width:480px;margin:0 auto}
+#player-cover{width:52px;height:52px;border-radius:10px;object-fit:cover;flex-shrink:0;background:var(--hair)}
+#player-info{flex:1;min-width:0;cursor:pointer}
+#player-name{font-size:14px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#player-artist{font-size:12px;color:var(--ink2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:2px}
+#player-controls{display:flex;align-items:center;gap:8px;flex-shrink:0}
+.player-btn{width:40px;height:40px;border-radius:50%;background:var(--hair);border:1px solid var(--glass-border);display:flex;align-items:center;justify-content:center;cursor:pointer;color:var(--ink);transition:all .15s;font-size:18px}
+.player-btn:active{transform:scale(.92);background:rgba(var(--accent-rgb),.15)}
+#btn-play{width:48px;height:48px;background:var(--accent);color:#000;font-size:20px;border:none}
+#btn-play:active{background:rgba(var(--accent-rgb),.8)}
+
+/* Progress bar */
+#progress-wrap{height:3px;background:var(--hair);border-radius:2px;cursor:pointer;margin-top:8px;position:relative}
+#progress-fill{height:100%;background:var(--accent);border-radius:2px;transition:width .1s linear;width:0%}
+#progress-thumb{position:absolute;top:-5px;width:14px;height:14px;border-radius:50%;background:var(--accent);transform:translateX(-50%);opacity:0;transition:opacity .15s,left .1s linear}
+#progress-wrap:active #progress-thumb,#progress-wrap:hover #progress-thumb{opacity:1}
+
+/* Now Playing full page */
+#now-playing{position:fixed;inset:0;z-index:200;background:var(--bg);display:none;flex-direction:column;align-items:center;justify-content:center;padding:24px}
+#now-playing.active{display:flex}
+#np-close{position:absolute;top:16px;left:16px;width:36px;height:36px;border-radius:50%;background:var(--glass);border:1px solid var(--glass-border);color:var(--ink);cursor:pointer;font-size:18px;z-index:201;display:flex;align-items:center;justify-content:center}
+#np-cover{width:280px;height:280px;border-radius:20px;object-fit:cover;margin-bottom:24px;box-shadow:0 24px 60px rgba(0,0,0,.5)}
+#np-name{font-size:20px;font-weight:800;text-align:center;margin-bottom:4px}
+#np-artist{font-size:14px;color:var(--ink2);text-align:center;margin-bottom:24px}
+#np-lyrics{text-align:center;font-size:16px;line-height:2;max-height:120px;overflow:hidden;color:var(--ink2);transition:all .3s}
+#np-lyrics .current{color:var(--accent);font-weight:700;font-size:18px}
+#np-progress{margin-top:24px;width:100%;max-width:320px}
+
+/* Toast */
+#toast{position:fixed;top:20px;left:50%;transform:translateX(-50%);z-index:999;padding:10px 20px;border-radius:20px;background:var(--glass);border:1px solid var(--glass-border);color:var(--ink);font-size:13px;opacity:0;transition:opacity .3s;pointer-events:none}
+#toast.show{opacity:1}
+
+/* Loading */
+.spinner{width:24px;height:24px;border:2px solid var(--hair);border-top-color:var(--accent);border-radius:50%;animation:spin .8s linear infinite;margin:20px auto}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* Playlist items */
+.playlist-item{display:flex;align-items:center;gap:12px;padding:10px 12px;border-radius:12px;cursor:pointer;transition:background .15s}
+.playlist-item:active{background:var(--hair)}
+.playlist-cover{width:48px;height:48px;border-radius:8px;object-fit:cover;flex-shrink:0;background:var(--hair)}
+.playlist-info{flex:1;min-width:0}
+.playlist-name{font-size:14px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.playlist-meta{font-size:12px;color:var(--ink2);margin-top:2px}
+
+/* Empty state */
+.empty{text-align:center;padding:40px 20px;color:var(--muted)}
+.empty-icon{font-size:40px;margin-bottom:12px}
+.empty-text{font-size:14px}
+
+/* Responsive */
+@media(min-width:420px){
+  #np-cover{width:320px;height:320px}
+}
+</style>
+</head>
+<body>
+
+<canvas id="particle-canvas"></canvas>
+
+<div id="app">
+  <div id="header">
+    <div id="header-left">
+      <div id="avatar-btn" onclick="showPage('login')">👤</div>
+      <span id="user-name">未登录</span>
+    </div>
+    <div id="weather-chip" onclick="showPage('home')">
+      <span class="temp" id="weather-temp">--°</span>
+      <span id="weather-city-name">--</span>
+    </div>
+  </div>
+
+  <div id="tabs">
+    <div class="tab active" data-page="home" onclick="showPage('home')">🏠 首页</div>
+    <div class="tab" data-page="search" onclick="showPage('search')">🔍 搜索</div>
+    <div class="tab" data-page="playlists" onclick="showPage('playlists')">📋 歌单</div>
+  </div>
+
+  <div id="content">
+    <div id="page-home" class="page active"></div>
+    <div id="page-search" class="page"></div>
+    <div id="page-playlists" class="page"></div>
+    <div id="page-login" class="page"></div>
+  </div>
+</div>
+
+<!-- Player bar -->
+<div id="player-bar">
+  <div id="progress-wrap" onclick="seekAudio(event)">
+    <div id="progress-fill"></div>
+    <div id="progress-thumb"></div>
+  </div>
+  <div id="player-bar-inner">
+    <img id="player-cover" src="" alt="" onerror="this.style.display='none'">
+    <div id="player-info" onclick="openNowPlaying()">
+      <div id="player-name">未在播放</div>
+      <div id="player-artist">选择一首歌曲</div>
+    </div>
+    <div id="player-controls">
+      <button class="player-btn" onclick="prevSong()" title="上一首">⏮</button>
+      <button class="player-btn" id="btn-play" onclick="togglePlay()">▶</button>
+      <button class="player-btn" onclick="nextSong()" title="下一首">⏭</button>
+    </div>
+  </div>
+</div>
+
+<!-- Now Playing fullscreen -->
+<div id="now-playing">
+  <button id="np-close" onclick="closeNowPlaying()">✕</button>
+  <img id="np-cover" src="" alt="" onerror="this.style.display='none'">
+  <div id="np-name"></div>
+  <div id="np-artist"></div>
+  <div id="np-lyrics"></div>
+  <div id="np-progress">
+    <div id="progress-wrap" style="margin-top:0" onclick="seekAudio(event)">
+      <div id="progress-fill" style="width:0%"></div>
+      <div id="progress-thumb"></div>
+    </div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script src="vendor/gsap.min.js"></script>
+<script>
+// ==================== CONFIG ====================
+// Auto-detect API server: same origin in production, localhost in dev
+const API_BASE = location.hostname === 'localhost' || location.hostname === '127.0.0.1'
+  ? 'http://localhost:3000'
+  : location.origin;
+
+// ==================== STATE ====================
+const state = {
+  loggedIn: false,
+  provider: 'netease', // 'netease' | 'qq'
+  loginInfo: null,
+  qqLoginInfo: null,
+  weather: null,
+  currentSong: null,
+  queue: [],
+  queueIndex: -1,
+  playing: false,
+  currentLyric: '',
+  lyricLines: [],
+  currentPage: 'home',
+};
+
+const audio = new Audio();
+audio.crossOrigin = 'anonymous';
+
+// ==================== API CLIENT ====================
+async function api(path, params = {}, opts = {}) {
+  const u = new URL(API_BASE + path);
+  Object.entries(params).forEach(([k,v]) => { if(v != null) u.searchParams.set(k, String(v)); });
+  const res = await fetch(u.toString(), {
+    method: opts.method || 'GET',
+    headers: { 'Content-Type': 'application/json' },
+    body: opts.body ? JSON.stringify(opts.body) : undefined,
+  });
+  return res.json();
+}
+
+// ==================== PARTICLES ====================
+const particleCanvas = document.getElementById('particle-canvas');
+const pctx = particleCanvas.getContext('2d');
+let particles = [];
+let particlePlaying = false;
+
+function resizeCanvas() {
+  particleCanvas.width = window.innerWidth;
+  particleCanvas.height = window.innerHeight;
+}
+window.addEventListener('resize', resizeCanvas);
+resizeCanvas();
+
+function spawnParticles() {
+  if (particles.length > 80) return;
+  for (let i = 0; i < 4; i++) {
+    particles.push({
+      x: Math.random() * particleCanvas.width,
+      y: particleCanvas.height + 10,
+      vx: (Math.random() - 0.5) * 1.5,
+      vy: -(Math.random() * 1.5 + 0.8),
+      size: Math.random() * 3 + 1.5,
+      life: 1,
+      decay: Math.random() * 0.008 + 0.004,
+      hue: state.playing ? (Math.random() < 0.7 ? 170 : 44) : 170,
+    });
+  }
+}
+
+function drawParticles() {
+  pctx.clearRect(0, 0, particleCanvas.width, particleCanvas.height);
+  for (let i = particles.length - 1; i >= 0; i--) {
+    const p = particles[i];
+    p.x += p.vx;
+    p.y += p.vy;
+    p.life -= p.decay;
+    if (p.life <= 0) { particles.splice(i,1); continue; }
+    pctx.beginPath();
+    pctx.arc(p.x, p.y, p.size, 0, Math.PI*2);
+    pctx.fillStyle = `hsla(${p.hue}, 90%, 70%, ${p.life * 0.6})`;
+    pctx.fill();
+    // glow
+    pctx.beginPath();
+    pctx.arc(p.x, p.y, p.size*2.5, 0, Math.PI*2);
+    pctx.fillStyle = `hsla(${p.hue}, 90%, 70%, ${p.life * 0.1})`;
+    pctx.fill();
+  }
+}
+
+function particleLoop() {
+  if (particlePlaying) spawnParticles();
+  if (!particlePlaying && particles.length === 0) {
+    // occasional ambient particles
+    if (Math.random() < 0.3) spawnParticles();
+  }
+  drawParticles();
+  requestAnimationFrame(particleLoop);
+}
+particleLoop();
+
+// ==================== AUDIO PLAYER ====================
+async function playSong(song, queue, index) {
+  if (!song) return;
+  state.currentSong = song;
+  state.queue = queue || [song];
+  state.queueIndex = index >= 0 ? index : 0;
+  state.playing = true;
+  particlePlaying = true;
+
+  updatePlayerBar();
+  updateNowPlaying();
+
+  // Get audio URL
+  let audioUrl = '';
+  try {
+    if (song.provider === 'qq' || song.source === 'qq') {
+      const r = await api('/api/qq/song/url', { mid: song.mid || song.id, mediaMid: song.mediaMid || '' });
+      audioUrl = r.url || '';
+    } else {
+      const r = await api('/api/song/url', { id: song.id, quality: 'exhigh' });
+      audioUrl = r.url || '';
+    }
+  } catch(e) { console.error('get url error:', e); }
+
+  if (!audioUrl) {
+    toast('无法获取播放地址，可能需登录或版权限制');
+    return;
+  }
+
+  // Proxy through server
+  const proxyUrl = API_BASE + '/api/audio?url=' + encodeURIComponent(audioUrl);
+  audio.src = proxyUrl;
+  audio.play().catch(e => { console.warn('play failed:', e); toast('播放失败，点击重试'); });
+
+  // Fetch lyrics
+  fetchLyrics(song);
+}
+
+async function fetchLyrics(song) {
+  state.lyricLines = [];
+  state.currentLyric = '';
+  document.getElementById('np-lyrics').innerHTML = '';
+  try {
+    let lyricText = '';
+    if (song.provider === 'qq' || song.source === 'qq') {
+      const r = await api('/api/qq/lyric', { mid: song.mid || song.id, id: song.qqId || '' });
+      lyricText = r.lyric || '';
+    } else {
+      const r = await api('/api/lyric', { id: song.id });
+      lyricText = (r.lrc && r.lrc.lyric) || r.lyric || '';
+    }
+    if (lyricText) {
+      state.lyricLines = parseLyric(lyricText);
+    }
+  } catch(e) {}
+}
+
+function parseLyric(text) {
+  const lines = [];
+  const re = /\[(\d{2}):(\d{2})(?:[.:](\d{2,3}))?\](.*)/g;
+  let m;
+  while ((m = re.exec(text))) {
+    const min = parseInt(m[1]), sec = parseInt(m[2]);
+    let ms = m[3] ? parseInt(m[3].padEnd(3,'0').slice(0,3)) : 0;
+    lines.push({ time: min*60 + sec + ms/1000, text: m[4].trim() });
+  }
+  lines.sort((a,b) => a.time - b.time);
+  return lines;
+}
+
+function togglePlay() {
+  if (!state.currentSong) return;
+  if (audio.paused) {
+    audio.play().catch(() => {});
+    state.playing = true;
+    particlePlaying = true;
+  } else {
+    audio.pause();
+    state.playing = false;
+    particlePlaying = false;
+  }
+  updatePlayBtn();
+}
+
+function nextSong() {
+  if (state.queue.length === 0) return;
+  const idx = (state.queueIndex + 1) % state.queue.length;
+  playSong(state.queue[idx], state.queue, idx);
+}
+
+function prevSong() {
+  if (state.queue.length === 0) return;
+  const idx = (state.queueIndex - 1 + state.queue.length) % state.queue.length;
+  playSong(state.queue[idx], state.queue, idx);
+}
+
+function seekAudio(e) {
+  if (!audio.duration) return;
+  const rect = e.target.getBoundingClientRect();
+  const pct = (e.clientX - rect.left) / rect.width;
+  audio.currentTime = pct * audio.duration;
+}
+
+audio.addEventListener('timeupdate', () => {
+  if (!audio.duration) return;
+  const pct = (audio.currentTime / audio.duration) * 100;
+  document.querySelectorAll('#progress-fill').forEach(el => el.style.width = pct + '%');
+  document.querySelectorAll('#progress-thumb').forEach(el => el.style.left = pct + '%');
+  updateLyricDisplay();
+});
+
+audio.addEventListener('ended', nextSong);
+audio.addEventListener('pause', () => { state.playing = false; particlePlaying = false; updatePlayBtn(); });
+audio.addEventListener('play', () => { state.playing = true; particlePlaying = true; updatePlayBtn(); });
+
+function updatePlayBtn() {
+  document.getElementById('btn-play').textContent = state.playing ? '⏸' : '▶';
+}
+
+function updateLyricDisplay() {
+  const ct = audio.currentTime;
+  let currentIdx = -1;
+  for (let i = state.lyricLines.length - 1; i >= 0; i--) {
+    if (ct >= state.lyricLines[i].time) { currentIdx = i; break; }
+  }
+  const el = document.getElementById('np-lyrics');
+  if (!state.lyricLines.length) { el.innerHTML = '<div style="color:var(--muted)">🎵 纯音乐</div>'; return; }
+  const start = Math.max(0, currentIdx - 2);
+  const end = Math.min(state.lyricLines.length, currentIdx + 4);
+  el.innerHTML = state.lyricLines.slice(start, end).map((l,i) => {
+    const isCurrent = start + i === currentIdx;
+    return `<div class="${isCurrent ? 'current' : ''}">${l.text || '⋯'}</div>`;
+  }).join('');
+}
+
+function updatePlayerBar() {
+  const s = state.currentSong;
+  document.getElementById('player-name').textContent = s ? s.name : '未在播放';
+  document.getElementById('player-artist').textContent = s ? s.artist : '选择一首歌曲';
+  const cover = document.getElementById('player-cover');
+  cover.src = s && s.cover ? s.cover : '';
+  cover.style.display = s && s.cover ? '' : 'none';
+  updatePlayBtn();
+}
+
+function updateNowPlaying() {
+  const s = state.currentSong;
+  document.getElementById('np-name').textContent = s ? s.name : '';
+  document.getElementById('np-artist').textContent = s ? s.artist : '';
+  const cover = document.getElementById('np-cover');
+  cover.src = s && s.cover ? s.cover : '';
+  cover.style.display = s && s.cover ? '' : 'none';
+}
+
+function openNowPlaying() {
+  if (!state.currentSong) return;
+  document.getElementById('now-playing').classList.add('active');
+  updateNowPlaying();
+}
+
+function closeNowPlaying() {
+  document.getElementById('now-playing').classList.remove('active');
+}
+
+// ==================== UI ====================
+function showPage(name) {
+  state.currentPage = name;
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  const page = document.getElementById('page-' + name);
+  if (page) page.classList.add('active');
+  const tab = document.querySelector(`.tab[data-page="${name}"]`);
+  if (tab) tab.classList.add('active');
+  document.getElementById('content').scrollTop = 0;
+
+  if (name === 'home') loadHome();
+  else if (name === 'search') initSearch();
+  else if (name === 'playlists') loadPlaylists();
+  else if (name === 'login') initLogin();
+}
+
+function toast(msg) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.classList.add('show');
+  setTimeout(() => el.classList.remove('show'), 2000);
+}
+
+// ==================== HOME PAGE ====================
+async function loadHome() {
+  const page = document.getElementById('page-home');
+  page.innerHTML = '<div class="spinner"></div>';
+
+  // Load weather + discover in parallel
+  const [weatherRes, discoverRes] = await Promise.allSettled([
+    api('/api/weather/radio'),
+    api('/api/discover/home'),
+  ]);
+
+  const weather = weatherRes.status === 'fulfilled' ? weatherRes.value : null;
+  const discover = discoverRes.status === 'fulfilled' ? discoverRes.value : null;
+
+  if (weather && weather.weather) {
+    state.weather = weather;
+    const w = weather.weather;
+    document.getElementById('weather-temp').textContent = Math.round(w.temperature || 0) + '°';
+    document.getElementById('weather-city-name').textContent = w.city || '--';
+  }
+
+  let html = '';
+
+  // Weather hero
+  if (weather && weather.weather) {
+    const w = weather.weather;
+    html += `<div class="weather-hero">
+      <div class="weather-city">📍 ${w.city || ''}</div>
+      <div class="weather-desc">${w.description || ''}</div>
+      <div class="weather-temp">${Math.round(w.temperature || 0)}°</div>
+      <div class="weather-mood">🎧 ${weather.radio ? weather.radio.title : '天气电台'}</div>
+    </div>`;
+  }
+
+  // Weather songs
+  if (weather && weather.radio && weather.radio.songs && weather.radio.songs.length) {
+    html += '<div class="section-title">🌤️ 天气电台</div><div class="song-list">';
+    weather.radio.songs.forEach(s => {
+      html += songItemHTML(s);
+    });
+    html += '</div>';
+  }
+
+  // Daily recommendations
+  if (discover && discover.dailySongs && discover.dailySongs.length) {
+    html += '<div class="section-title">📅 每日推荐</div><div class="song-list">';
+    discover.dailySongs.forEach(s => {
+      html += songItemHTML(mapNeteaseSong(s));
+    });
+    html += '</div>';
+  }
+
+  // Playlists
+  if (discover && discover.playlists && discover.playlists.length) {
+    html += '<div class="section-title">📋 推荐歌单</div>';
+    discover.playlists.slice(0, 8).forEach(pl => {
+      html += playlistItemHTML(pl);
+    });
+  }
+
+  if (!html) html = '<div class="empty"><div class="empty-icon">🎵</div><div class="empty-text">加载中...</div></div>';
+  page.innerHTML = html;
+
+  // Attach click handlers
+  attachSongClicks(page);
+  attachPlaylistClicks(page);
+}
+
+// ==================== SEARCH PAGE ====================
+let searchTimeout = null;
+
+function initSearch() {
+  const page = document.getElementById('page-search');
+  if (page.querySelector('#search-input-wrap')) return; // already initialized
+
+  page.innerHTML = `
+    <div id="search-input-wrap">
+      <input id="search-input" type="text" placeholder="搜索歌曲、歌手、专辑..." autocomplete="off">
+      <button id="search-clear" onclick="clearSearch()">✕</button>
+    </div>
+    <div id="search-results"></div>
+  `;
+
+  const input = page.querySelector('#search-input');
+  input.addEventListener('input', () => {
+    const kw = input.value.trim();
+    document.getElementById('search-clear').style.display = kw ? 'flex' : 'none';
+    clearTimeout(searchTimeout);
+    if (kw.length < 1) { document.getElementById('search-results').innerHTML = ''; return; }
+    searchTimeout = setTimeout(() => doSearch(kw), 400);
+  });
+  input.focus();
+}
+
+function clearSearch() {
+  const input = document.querySelector('#search-input');
+  if (input) { input.value = ''; input.focus(); }
+  document.getElementById('search-clear').style.display = 'none';
+  document.getElementById('search-results').innerHTML = '';
+}
+
+async function doSearch(kw) {
+  const results = document.getElementById('search-results');
+  results.innerHTML = '<div class="spinner"></div>';
+
+  const [neteaseRes, qqRes] = await Promise.allSettled([
+    api('/api/search', { keywords: kw, limit: 15 }),
+    api('/api/qq/search', { keywords: kw, limit: 10 }),
+  ]);
+
+  let html = '';
+  const neSongs = neteaseRes.status === 'fulfilled' && neteaseRes.value.songs ? neteaseRes.value.songs : [];
+  const qqSongs = qqRes.status === 'fulfilled' && qqRes.value.songs ? qqRes.value.songs : [];
+
+  if (neSongs.length) {
+    html += '<div class="section-title">🔴 网易云音乐</div><div class="song-list">';
+    neSongs.forEach(s => { html += songItemHTML(s); });
+    html += '</div>';
+  }
+  if (qqSongs.length) {
+    html += '<div class="section-title">🟢 QQ 音乐</div><div class="song-list">';
+    qqSongs.forEach(s => { html += songItemHTML(s); });
+    html += '</div>';
+  }
+  if (!html) html = '<div class="empty"><div class="empty-icon">🔍</div><div class="empty-text">未找到结果</div></div>';
+
+  results.innerHTML = html;
+  attachSongClicks(results);
+}
+
+// ==================== PLAYLISTS PAGE ====================
+async function loadPlaylists() {
+  const page = document.getElementById('page-playlists');
+  page.innerHTML = '<div class="spinner"></div>';
+
+  const [neRes, qqRes] = await Promise.allSettled([
+    api('/api/user/playlists'),
+    api('/api/qq/user/playlists'),
+  ]);
+
+  let html = '';
+
+  if (neRes.status === 'fulfilled' && neRes.value.loggedIn && neRes.value.playlists) {
+    html += '<div class="section-title">🔴 网易云歌单</div>';
+    neRes.value.playlists.forEach(pl => { html += playlistItemHTML(pl); });
+  }
+
+  if (qqRes.status === 'fulfilled' && qqRes.value.loggedIn && qqRes.value.playlists) {
+    html += '<div class="section-title">🟢 QQ 音乐歌单</div>';
+    qqRes.value.playlists.forEach(pl => { html += playlistItemHTML(pl); });
+  }
+
+  if (!html) {
+    html = `<div class="empty">
+      <div class="empty-icon">🔒</div>
+      <div class="empty-text">请先登录网易云或QQ音乐</div>
+      <button onclick="showPage('login')" style="margin-top:16px;padding:12px 24px;border-radius:20px;background:var(--accent);color:#000;border:none;font-weight:700;cursor:pointer;font-size:14px">去登录</button>
+    </div>`;
+  }
+  page.innerHTML = html;
+  attachPlaylistClicks(page);
+}
+
+async function loadPlaylistSongs(pl) {
+  const page = document.getElementById('page-playlists');
+  page.innerHTML = '<div class="spinner"></div>';
+
+  try {
+    if (pl.provider === 'qq') {
+      const r = await api('/api/qq/playlist/tracks', { id: pl.id });
+      if (r.tracks && r.tracks.length) {
+        let html = `<div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;cursor:pointer" onclick="showPage('playlists')">← 返回</div>`;
+        html += `<div class="section-title">${pl.name}</div><div class="song-list">`;
+        r.tracks.forEach(s => { html += songItemHTML(s); });
+        html += '</div>';
+        page.innerHTML = html;
+        attachSongClicks(page);
+      }
+    } else {
+      const r = await api('/api/playlist/tracks', { id: pl.id });
+      if (r.songs && r.songs.length) {
+        let html = `<div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;cursor:pointer" onclick="showPage('playlists')">← 返回</div>`;
+        html += `<div class="section-title">${pl.name}</div><div class="song-list">`;
+        r.songs.forEach(s => { html += songItemHTML(mapNeteaseSong(s)); });
+        html += '</div>';
+        page.innerHTML = html;
+        attachSongClicks(page);
+      }
+    }
+  } catch(e) {
+    toast('加载歌单失败');
+    loadPlaylists();
+  }
+}
+
+// ==================== LOGIN PAGE ====================
+let loginProvider = 'netease';
+let qrPollTimer = null;
+
+function initLogin() {
+  const page = document.getElementById('page-login');
+  page.innerHTML = `
+    <div id="login-section">
+      <h2>登录音乐平台</h2>
+      <p>登录后同步歌单、解锁更高音质</p>
+      <div class="provider-tabs">
+        <div class="provider-tab active" data-provider="netease" onclick="switchLoginProvider('netease')">🔴 网易云</div>
+        <div class="provider-tab" data-provider="qq" onclick="switchLoginProvider('qq')">🟢 QQ音乐</div>
+      </div>
+      <div id="qr-container"><div class="spinner"></div></div>
+      <div id="login-status">正在生成二维码...</div>
+      <button onclick="showPage('home')" style="margin-top:20px;padding:10px 24px;border-radius:20px;background:var(--glass);border:1px solid var(--glass-border);color:var(--ink2);cursor:pointer;font-size:13px">暂不登录</button>
+    </div>
+  `;
+  switchLoginProvider('netease');
+}
+
+async function switchLoginProvider(prov) {
+  loginProvider = prov;
+  if (qrPollTimer) { clearInterval(qrPollTimer); qrPollTimer = null; }
+
+  document.querySelectorAll('.provider-tab').forEach(t => t.classList.remove('active'));
+  document.querySelector(`.provider-tab[data-provider="${prov}"]`)?.classList.add('active');
+
+  if (prov === 'netease') {
+    try {
+      const keyRes = await api('/api/login/qr/key');
+      if (!keyRes.key) { showLoginError('获取二维码失败'); return; }
+      const qrRes = await api('/api/login/qr/create', { key: keyRes.key });
+      if (qrRes.img) {
+        document.getElementById('qr-container').innerHTML = `<img src="${qrRes.img}" alt="QR">`;
+        document.getElementById('login-status').textContent = '请用网易云音乐APP扫码';
+        startQRPoll(keyRes.key);
+      } else {
+        showLoginError('生成二维码失败');
+      }
+    } catch(e) { showLoginError('网络错误: ' + e.message); }
+  } else {
+    // QQ login — show cookie input or instructions
+    document.getElementById('qr-container').innerHTML = `
+      <div style="padding:20px;color:var(--ink2);text-align:center">
+        <div style="font-size:40px;margin-bottom:12px">📱</div>
+        <div style="font-size:13px;line-height:1.8">
+          QQ音乐需要在电脑浏览器登录<br>
+          <code style="color:var(--accent);background:var(--hair);padding:4px 8px;border-radius:4px">y.qq.com</code><br>
+          登录后将Cookie粘贴到下方
+        </div>
+        <textarea id="qq-cookie-input" placeholder="粘贴QQ音乐Cookie..." style="width:100%;height:80px;margin-top:12px;padding:8px;border-radius:8px;background:var(--hair);border:1px solid var(--glass-border);color:var(--ink);font-size:12px;resize:none;font-family:monospace"></textarea>
+        <button onclick="submitQQCookie()" style="margin-top:8px;padding:10px 24px;border-radius:20px;background:var(--accent);color:#000;border:none;font-weight:700;cursor:pointer;font-size:13px">提交登录</button>
+      </div>
+    `;
+    document.getElementById('login-status').textContent = '或使用手机版QQ音乐APP扫码登录';
+  }
+}
+
+async function submitQQCookie() {
+  const raw = document.getElementById('qq-cookie-input')?.value?.trim();
+  if (!raw) { toast('请粘贴Cookie'); return; }
+  try {
+    const r = await api('/api/qq/login/cookie', {}, { method: 'POST', body: { cookie: raw } });
+    if (r.loggedIn) {
+      state.loggedIn = true;
+      state.qqLoginInfo = r;
+      document.getElementById('user-name').textContent = r.nickname || 'QQ用户';
+      document.getElementById('avatar-btn').innerHTML = r.avatar ? `<img src="${r.avatar}">` : '🟢';
+      toast('QQ音乐登录成功');
+      showPage('playlists');
+    } else {
+      toast(r.message || '登录失败，Cookie无效');
+    }
+  } catch(e) { toast('提交失败: ' + e.message); }
+}
+
+function startQRPoll(key) {
+  if (qrPollTimer) clearInterval(qrPollTimer);
+  qrPollTimer = setInterval(async () => {
+    try {
+      const r = await api('/api/login/qr/check', { key });
+      if (r.code === 803) {
+        clearInterval(qrPollTimer);
+        state.loggedIn = true;
+        state.loginInfo = r;
+        document.getElementById('login-status').textContent = '✅ 登录成功！';
+        document.getElementById('user-name').textContent = r.nickname || '网易云用户';
+        document.getElementById('avatar-btn').innerHTML = r.avatar ? `<img src="${r.avatar}">` : '🔴';
+        setTimeout(() => showPage('home'), 800);
+      } else if (r.code === 802) {
+        document.getElementById('login-status').textContent = '已扫描，请在手机上确认...';
+      } else if (r.code === 800) {
+        document.getElementById('login-status').textContent = '二维码已过期，重新生成...';
+        clearInterval(qrPollTimer);
+        switchLoginProvider('netease');
+      }
+    } catch(e) {}
+  }, 1500);
+}
+
+function showLoginError(msg) {
+  document.getElementById('qr-container').innerHTML = `<div style="padding:20px;color:var(--danger)">${msg}</div>`;
+  document.getElementById('login-status').textContent = '请重试';
+}
+
+// ==================== CHECK LOGIN STATUS ====================
+async function checkLoginStatus() {
+  try {
+    const [neRes, qqRes] = await Promise.allSettled([
+      api('/api/login/status'),
+      api('/api/qq/login/status'),
+    ]);
+    if (neRes.status === 'fulfilled' && neRes.value.loggedIn) {
+      state.loggedIn = true;
+      state.loginInfo = neRes.value;
+      document.getElementById('user-name').textContent = neRes.value.nickname || '网易云用户';
+      document.getElementById('avatar-btn').innerHTML = neRes.value.avatar ? `<img src="${neRes.value.avatar}">` : '🔴';
+    }
+    if (qqRes.status === 'fulfilled' && qqRes.value.loggedIn) {
+      state.loggedIn = true;
+      state.qqLoginInfo = qqRes.value;
+      if (!state.loginInfo) {
+        document.getElementById('user-name').textContent = qqRes.value.nickname || 'QQ用户';
+        document.getElementById('avatar-btn').innerHTML = qqRes.value.avatar ? `<img src="${qqRes.value.avatar}">` : '🟢';
+      }
+    }
+  } catch(e) {}
+}
+
+// ==================== HELPERS ====================
+function mapNeteaseSong(s) {
+  s = s || {};
+  const artists = s.ar || s.artists || [];
+  const album = s.al || s.album || {};
+  return {
+    provider: 'netease', source: 'netease', type: 'song',
+    id: s.id, name: s.name || s.title || '',
+    artist: artists.map(a => a.name).join(' / '),
+    artists, album: album.name || '', cover: album.picUrl || s.cover || '',
+    duration: s.dt || s.duration || 0,
+  };
+}
+
+function songItemHTML(s) {
+  const sourceClass = (s.provider === 'qq' || s.source === 'qq') ? 'qq' : 'netease';
+  const sourceLabel = sourceClass === 'qq' ? 'QQ' : 'NE';
+  const cover = s.cover || '';
+  return `<div class="song-item" data-song='${JSON.stringify(s).replace(/'/g,"&#39;")}'>
+    <img class="song-cover" src="${cover}" alt="" onerror="this.style.display='none'" loading="lazy">
+    <div class="song-info">
+      <div class="song-name">${escapeHtml(s.name || '')}</div>
+      <div class="song-artist">${escapeHtml(s.artist || '')}</div>
+    </div>
+    <span class="song-source ${sourceClass}">${sourceLabel}</span>
+  </div>`;
+}
+
+function playlistItemHTML(pl) {
+  const cover = pl.cover || '';
+  return `<div class="playlist-item" data-playlist='${JSON.stringify(pl).replace(/'/g,"&#39;")}'>
+    <img class="playlist-cover" src="${cover}" alt="" onerror="this.style.display='none'" loading="lazy">
+    <div class="playlist-info">
+      <div class="playlist-name">${escapeHtml(pl.name || '')}</div>
+      <div class="playlist-meta">${pl.trackCount || 0} 首 · ${escapeHtml(pl.creator || '')}</div>
+    </div>
+  </div>`;
+}
+
+function escapeHtml(s) {
+  const div = document.createElement('div');
+  div.textContent = s || '';
+  return div.innerHTML;
+}
+
+function attachSongClicks(container) {
+  container.querySelectorAll('.song-item').forEach(el => {
+    el.addEventListener('click', () => {
+      try {
+        const song = JSON.parse(el.dataset.song);
+        const songs = Array.from(container.querySelectorAll('.song-item')).map(e => {
+          try { return JSON.parse(e.dataset.song); } catch(_) { return null; }
+        }).filter(Boolean);
+        const idx = songs.findIndex(s => s.id === song.id && s.provider === song.provider);
+        playSong(song, songs, idx >= 0 ? idx : 0);
+      } catch(e) {}
+    });
+  });
+}
+
+function attachPlaylistClicks(container) {
+  container.querySelectorAll('.playlist-item').forEach(el => {
+    el.addEventListener('click', () => {
+      try {
+        const pl = JSON.parse(el.dataset.playlist);
+        loadPlaylistSongs(pl);
+      } catch(e) {}
+    });
+  });
+}
+
+// ==================== INIT ====================
+async function init() {
+  checkLoginStatus();
+  loadHome();
+}
+
+// Handle back button to close now-playing
+window.addEventListener('popstate', () => {
+  if (document.getElementById('now-playing').classList.contains('active')) {
+    closeNowPlaying();
+  }
+});
+
+// Push state when opening now-playing
+const origOpenNP = openNowPlaying;
+openNowPlaying = function() {
+  if (!state.currentSong) return;
+  history.pushState({np: true}, '');
+  origOpenNP();
+};
+
+init();
+</script>
+</body>
+</html>
